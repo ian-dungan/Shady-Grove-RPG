@@ -1,7 +1,17 @@
 const WebSocket = require('ws');
 const http = require('http');
+const { randomUUID } = require('crypto');
 
 const PORT = process.env.PORT || 3000;
+const HEARTBEAT_INTERVAL = 30000;
+
+function generatePlayerId() {
+    try {
+        return randomUUID();
+    } catch (error) {
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+}
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
@@ -15,21 +25,37 @@ const wss = new WebSocket.Server({ server });
 // Store connected players
 const players = new Map();
 
+function sanitizePlayerName(name) {
+    if (typeof name !== 'string') return 'Player';
+    return name.trim().slice(0, 50) || 'Player';
+}
+
+function sanitizeChatMessage(message) {
+    if (typeof message !== 'string') return '';
+    return message.trim().slice(0, 280);
+}
+
 wss.on('connection', (ws) => {
     console.log('New player connected');
-    
+
     let playerId = null;
-    
+
+    ws.isAlive = true;
+    ws.on('pong', () => {
+        ws.isAlive = true;
+    });
+
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
-            
+
             switch (data.type) {
                 case 'join':
-                    playerId = Date.now() + Math.random();
+                    playerId = generatePlayerId();
+                    const playerName = sanitizePlayerName(data.player);
                     players.set(playerId, {
                         id: playerId,
-                        name: data.player,
+                        name: playerName,
                         ws: ws
                     });
                     
@@ -42,7 +68,7 @@ wss.on('connection', (ws) => {
                     // Broadcast to all
                     broadcast({
                         type: 'playerJoined',
-                        player: data.player,
+                        player: playerName,
                         playerCount: players.size
                     }, playerId);
                     break;
@@ -69,32 +95,53 @@ wss.on('connection', (ws) => {
                 case 'chat':
                     // Broadcast chat messages
                     const player = players.get(playerId);
+                    const messageText = sanitizeChatMessage(data.message);
+                    if (!messageText) return;
                     broadcast({
                         type: 'chat',
                         player: player ? player.name : 'Unknown',
-                        message: data.message
+                        message: messageText
                     });
                     break;
+                default:
+                    ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
             }
         } catch (e) {
             console.error('Error parsing message:', e);
+            ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
         }
     });
-    
+
     ws.on('close', () => {
-        if (playerId) {
-            const player = players.get(playerId);
-            players.delete(playerId);
-            
-            broadcast({
-                type: 'playerLeft',
-                player: player ? player.name : 'Unknown',
-                playerCount: players.size
-            });
-        }
+        removePlayer(playerId);
         console.log('Player disconnected');
     });
 });
+
+const heartbeat = setInterval(() => {
+    wss.clients.forEach((client) => {
+        if (client.isAlive === false) {
+            client.terminate();
+            return;
+        }
+
+        client.isAlive = false;
+        client.ping();
+    });
+}, HEARTBEAT_INTERVAL);
+
+function removePlayer(playerId) {
+    if (!playerId) return;
+    const player = players.get(playerId);
+    if (!player) return;
+
+    players.delete(playerId);
+    broadcast({
+        type: 'playerLeft',
+        player: player ? player.name : 'Unknown',
+        playerCount: players.size
+    });
+}
 
 function broadcast(data, excludeId = null) {
     const message = JSON.stringify(data);
@@ -107,4 +154,8 @@ function broadcast(data, excludeId = null) {
 
 server.listen(PORT, () => {
     console.log(`Game server listening on port ${PORT}`);
+});
+
+wss.on('close', () => {
+    clearInterval(heartbeat);
 });
