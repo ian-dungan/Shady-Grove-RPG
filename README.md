@@ -2,15 +2,23 @@
 
 Complete 2.5D SNES-style RPG with massive open world, procedural terrain, classes, combat, quests, and multiplayer.
 
-## 🌍 MASSIVE STATIC WORLD
+## 🌍 MASSIVE DETAILED WORLD
 - **300x300 tiles** = 90,000 explorable tiles!
-- **Hand-crafted static world map** - same every playthrough
-- **9 unique biomes**: Water, Beach, Plains, Grassland, Forest, Hills, Mountains, Desert, Snow
-- **SNES Final Fantasy-style graphics** with detailed tile rendering
-- **2000+ fixed decorations**: Trees, rocks, cacti, ice crystals in consistent locations
-- **8 named locations**: Villages, towns, castles, dungeons, and temples
-- **Randomized monster encounters** - enemies spawn randomly but world is static
-- Quest markers at fixed locations across the continent
+- **Hand-crafted static world** - same every playthrough for consistency
+- **9 unique biomes** with detailed graphics: Water, Beach, Plains, Grassland, Forest, Hills, Mountains, Desert, Snow
+- **SNES Final Fantasy-quality graphics** - gradients, textures, terrain details
+- **Flowing rivers** - Two major rivers with bridges connecting regions
+- **Mountain ranges** - Realistic peaks with snow caps in the north
+- **2000+ decorations** - Trees, rocks, cacti, crystals in fixed locations
+- **23 named settlements**:
+  - 1 Capital City (large 8x8 grid with castle)
+  - 3 Cities (6x6 grids with fountains)
+  - 6 Towns (5x5 grids with town squares)
+  - 8 Villages (3x3 cozy settlements)
+  - 3 Castles (detailed fortresses)
+  - 2 Dungeons (ominous entrances)
+- **Varied encounter rates** by terrain type
+- Quest markers at fixed story locations
 
 ## Quick Start
 
