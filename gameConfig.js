@@ -24,7 +24,7 @@ const GameConfig = {
             legendSword: { name: 'Legendary Sword', effect: 'attack', value: 50, price: 0, icon: 'sword_legend' }
         },
         tilesets: {
-            grass: 'assets/tileset_grass',
+            grass: 'assets/rpg nature tileset',
             dungeon: 'tileset_dungeon',
             castle: 'tileset_castle'
         }
