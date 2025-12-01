@@ -24,7 +24,7 @@ const GameConfig = {
             legendSword: { name: 'Legendary Sword', effect: 'attack', value: 50, price: 0, icon: 'sword_legend' }
         },
         tilesets: {
-            grass: 'assets/rpg nature tileset',
+            grass: 'tileset_grass',
             dungeon: 'tileset_dungeon',
             castle: 'tileset_castle'
         }
@@ -145,7 +145,7 @@ const GameConfig = {
 
     // WebSocket Configuration
     websocket: {
-        url: 'wss://shady-grove-rpg.onrender.com/', // Replace with your Render WebSocket URL
+        url: 'wss://your-render-app.onrender.com', // Replace with your Render WebSocket URL
         reconnectInterval: 3000
     },
 

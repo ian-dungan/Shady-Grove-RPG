@@ -182,54 +182,76 @@ class StaticWorldMap {
 
 // ===== TILE RENDERER =====
 class TileRenderer {
-    static createDetailedTile(scene, biome, x, y, variant = 0) {
+    static texturesGenerated = false;
+    
+    static generateAllTextures(scene) {
+        if (this.texturesGenerated) return;
+        
+        const biomes = ['water', 'river', 'beach', 'plains', 'grassland', 'forest', 'hills', 'mountain', 'desert', 'snow', 'bridge'];
+        
+        biomes.forEach(biome => {
+            // Create 4 variants per biome for variety
+            for (let variant = 0; variant < 4; variant++) {
+                const graphics = scene.add.graphics();
+                
+                switch (biome) {
+                    case 'water':
+                        this.drawWater(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'river':
+                        this.drawRiver(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'beach':
+                        this.drawBeach(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'plains':
+                        this.drawPlains(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'grassland':
+                        this.drawGrassland(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'forest':
+                        this.drawForest(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'hills':
+                        this.drawHills(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'mountain':
+                        this.drawMountain(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'desert':
+                        this.drawDesert(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'snow':
+                        this.drawSnow(graphics, 0, 0, 32, variant, variant);
+                        break;
+                    case 'bridge':
+                        this.drawBridge(graphics, 0, 0, 32, variant, variant);
+                        break;
+                }
+                
+                graphics.generateTexture(`tile_${biome}_${variant}`, 32, 32);
+                graphics.destroy();
+            }
+        });
+        
+        this.texturesGenerated = true;
+    }
+    
+    static createDetailedTile(scene, biome, x, y) {
         const tileSize = 32;
         const baseX = x * tileSize;
         const baseY = y * tileSize;
         
-        const graphics = scene.add.graphics();
+        // Use variant based on position for variety
+        const variant = (x * 7 + y * 11) % 4;
         
-        switch (biome) {
-            case 'water':
-                this.drawWater(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'beach':
-                this.drawBeach(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'plains':
-                this.drawPlains(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'grassland':
-                this.drawGrassland(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'forest':
-                this.drawForest(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'hills':
-                this.drawHills(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'mountain':
-                this.drawMountain(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'desert':
-                this.drawDesert(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'snow':
-                this.drawSnow(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'river':
-                this.drawRiver(graphics, baseX, baseY, tileSize, x, y);
-                break;
-            case 'bridge':
-                this.drawBridge(graphics, baseX, baseY, tileSize, x, y);
-                break;
-        }
-        
-        // Generate texture and destroy graphics
-        graphics.generateTexture(`tile_${x}_${y}`, tileSize, tileSize);
-        const tile = scene.add.image(baseX + tileSize/2, baseY + tileSize/2, `tile_${x}_${y}`);
+        const tile = scene.add.image(
+            baseX + tileSize/2,
+            baseY + tileSize/2,
+            `tile_${biome}_${variant}`
+        );
         tile.setDepth(-50);
-        graphics.destroy();
     }
     
     static drawWater(g, x, y, size, tileX, tileY) {
@@ -276,7 +298,6 @@ class TileRenderer {
         g.fillRect(0, 0, size, size);
         
         // Sand texture
-        const rand = (tileX * 73 + tileY * 37) % 100;
         for (let i = 0; i < 8; i++) {
             g.fillStyle(0xf1c40f, 0.2);
             const px = ((tileX + i) * 13) % size;
@@ -285,11 +306,9 @@ class TileRenderer {
         }
         
         // Shells
-        if (rand < 15) {
+        if (tileX % 5 === 0) {
             g.fillStyle(0xffffff, 0.6);
             g.fillCircle(size * 0.6, size * 0.4, 3);
-            g.fillStyle(0xd5dbdb, 0.4);
-            g.fillCircle(size * 0.62, size * 0.42, 2);
         }
     }
     
@@ -310,8 +329,6 @@ class TileRenderer {
         if ((tileX + tileY) % 11 === 0) {
             g.fillStyle(0xff69b4, 0.8);
             g.fillCircle(size * 0.7, size * 0.3, 2);
-            g.fillStyle(0xffd700, 0.8);
-            g.fillCircle(size * 0.7, size * 0.3, 1);
         }
     }
     
@@ -325,16 +342,13 @@ class TileRenderer {
         g.fillStyle(0x1e8449, 0.3);
         if (pattern === 0) {
             g.fillRect(size * 0.5, 0, size * 0.5, size * 0.5);
-        } else if (pattern === 1) {
-            g.fillRect(0, size * 0.5, size * 0.5, size * 0.5);
         }
         
         // Tall grass
         g.fillStyle(0x2ecc71, 0.5);
         for (let i = 0; i < 4; i++) {
             const gx = ((tileX * 7 + i) * 13) % size;
-            const gy = size - 4;
-            g.fillRect(gx, gy, 2, 4);
+            g.fillRect(gx, size - 4, 2, 4);
         }
     }
     
@@ -347,17 +361,9 @@ class TileRenderer {
         g.fillStyle(0x229954, 0.5);
         g.fillRect(0, size * 0.7, size, size * 0.3);
         
-        // Shadows from trees
+        // Shadows
         g.fillStyle(0x0b2e13, 0.4);
-        const shadowX = ((tileX * 23) % size);
-        const shadowY = ((tileY * 19) % size);
-        g.fillCircle(shadowX, shadowY, 12);
-        
-        // Moss patches
-        if ((tileX + tileY) % 7 === 0) {
-            g.fillStyle(0x27ae60, 0.6);
-            g.fillCircle(size * 0.3, size * 0.6, 6);
-        }
+        g.fillCircle(size/2, size/2, 12);
     }
     
     static drawHills(g, x, y, size, tileX, tileY) {
@@ -367,20 +373,12 @@ class TileRenderer {
         
         // Hill contours
         g.lineStyle(2, 0x8b7209, 0.4);
-        const curve1 = Math.sin(tileX * 0.3) * 6;
-        const curve2 = Math.sin(tileY * 0.4) * 4;
-        g.strokeRect(0, size * 0.4 + curve1, size, 2);
-        g.strokeRect(0, size * 0.6 + curve2, size, 1);
+        const curve = Math.sin(tileX * 0.3) * 6;
+        g.strokeRect(0, size * 0.4 + curve, size, 2);
         
         // Grass on hills
         g.fillStyle(0x52c234, 0.5);
         g.fillRect(0, 0, size, size * 0.3);
-        
-        // Rocks
-        if ((tileX * tileY) % 13 === 0) {
-            g.fillStyle(0x5d6d7e, 0.8);
-            g.fillCircle(size * 0.6, size * 0.5, 4);
-        }
     }
     
     static drawMountain(g, x, y, size, tileX, tileY) {
@@ -397,28 +395,11 @@ class TileRenderer {
         g.closePath();
         g.fillPath();
         
-        // Highlights
-        g.fillStyle(0x85929e, 0.4);
-        g.fillTriangle(
-            size * 0.3, size * 0.5,
-            size * 0.5, size * 0.2,
-            size * 0.6, size * 0.5
-        );
-        
         // Snow cap
-        if (tileY < 60) {
+        if (tileY < 2) {
             g.fillStyle(0xffffff, 0.8);
-            g.fillTriangle(
-                size * 0.4, size * 0.3,
-                size * 0.5, size * 0.2,
-                size * 0.6, size * 0.3
-            );
+            g.fillTriangle(size * 0.4, size * 0.3, size * 0.5, size * 0.2, size * 0.6, size * 0.3);
         }
-        
-        // Cracks
-        g.lineStyle(1, 0x1a252f, 0.5);
-        g.lineTo(size * 0.3, size * 0.6, size * 0.4, size);
-        g.strokePath();
     }
     
     static drawDesert(g, x, y, size, tileX, tileY) {
@@ -428,21 +409,12 @@ class TileRenderer {
         
         // Sand dunes
         g.fillStyle(0xd68910, 0.4);
-        const dune1 = Math.sin(tileX * 0.4) * 8;
-        const dune2 = Math.sin(tileY * 0.3) * 6;
-        g.fillEllipse(size * 0.5, size * 0.5 + dune1, size * 0.6, size * 0.3);
+        const dune = Math.sin(tileX * 0.4) * 8;
+        g.fillEllipse(size * 0.5, size * 0.5 + dune, size * 0.6, size * 0.3);
         
         // Sand ripples
         g.lineStyle(1, 0xca6f1e, 0.3);
-        for (let i = 0; i < 3; i++) {
-            g.strokeRect(0, i * size/3 + dune2, size, 1);
-        }
-        
-        // Sparse vegetation
-        if ((tileX + tileY) % 17 === 0) {
-            g.fillStyle(0x7d6608, 0.6);
-            g.fillRect(size * 0.7, size * 0.6, 2, 4);
-        }
+        g.strokeRect(0, size/2, size, 1);
     }
     
     static drawSnow(g, x, y, size, tileX, tileY) {
@@ -456,17 +428,11 @@ class TileRenderer {
         g.fillEllipse(size * 0.5, size * 0.7 + drift, size * 0.7, size * 0.4);
         
         // Sparkles
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 3; i++) {
             g.fillStyle(0xffffff, 0.9);
             const sx = ((tileX + i) * 7) % size;
             const sy = ((tileY + i) * 11) % size;
             g.fillCircle(sx, sy, 1);
-        }
-        
-        // Footprint shadows
-        if ((tileX * tileY) % 19 === 0) {
-            g.fillStyle(0xbdc3c7, 0.3);
-            g.fillCircle(size * 0.4, size * 0.5, 5);
         }
     }
     
@@ -484,12 +450,6 @@ class TileRenderer {
         for (let i = 0; i < 5; i++) {
             g.fillRect(i * size/5, size * 0.3, 2, size * 0.4);
         }
-        
-        // Rope rails
-        g.lineStyle(2, 0x654321, 0.8);
-        g.lineTo(0, size * 0.35, size, size * 0.35);
-        g.lineTo(0, size * 0.65, size, size * 0.65);
-        g.strokePath();
     }
 }
 
@@ -810,6 +770,9 @@ class GameScene extends Phaser.Scene {
         this.tileSize = 32;
         
         console.log('Generating static world: ' + this.worldWidth + 'x' + this.worldHeight + ' tiles...');
+        
+        // Pre-generate all tile textures FIRST
+        TileRenderer.generateAllTextures(this);
         
         // Generate STATIC terrain map
         this.worldMap = StaticWorldMap.createWorldMap(this.worldWidth, this.worldHeight);
