@@ -183,58 +183,109 @@ class StaticWorldMap {
 // ===== TILE RENDERER =====
 class TileRenderer {
     static texturesGenerated = false;
-    
+    static backdropGenerated = false;
+
+    static noise(x, y) {
+        return ((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1) - 0.5;
+    }
+
+    static generateBackdropTextures(scene) {
+        if (this.backdropGenerated) return;
+
+        const width = 1024;
+        const height = 768;
+
+        // Sky gradient
+        const sky = scene.add.graphics();
+        sky.fillGradientStyle(0x1b263b, 0x1b263b, 0x0d1b2a, 0x0d1b2a, 1);
+        sky.fillRect(0, 0, width, height);
+        sky.generateTexture('bg_sky_gradient', width, height);
+        sky.destroy();
+
+        // Distant mountains for parallax depth
+        const mountains = scene.add.graphics();
+        mountains.fillStyle(0x1f4068, 1);
+        mountains.fillTriangle(0, height, width * 0.2, height * 0.45, width * 0.4, height);
+        mountains.fillTriangle(width * 0.25, height, width * 0.55, height * 0.38, width * 0.85, height);
+        mountains.fillTriangle(width * 0.6, height, width * 0.85, height * 0.5, width, height);
+        mountains.generateTexture('bg_mountains', width, height);
+        mountains.destroy();
+
+        // Soft clouds for slow parallax drift
+        const clouds = scene.add.graphics();
+        clouds.fillStyle(0xffffff, 0.8);
+        for (let i = 0; i < 6; i++) {
+            const cx = 120 + i * 140;
+            const cy = 120 + Math.sin(i) * 40;
+            clouds.fillEllipse(cx, cy, 180, 70);
+            clouds.fillEllipse(cx + 50, cy + 10, 160, 60);
+            clouds.fillEllipse(cx - 60, cy + 6, 140, 50);
+        }
+        clouds.generateTexture('bg_clouds', width, height / 2);
+        clouds.destroy();
+
+        // Atmospheric particle texture
+        const particle = scene.add.graphics();
+        particle.fillStyle(0xffffff, 1);
+        particle.fillCircle(4, 4, 4);
+        particle.generateTexture('atmos_particle', 8, 8);
+        particle.destroy();
+
+        this.backdropGenerated = true;
+    }
+
     static generateAllTextures(scene) {
         if (this.texturesGenerated) return;
-        
+
         const biomes = ['water', 'river', 'beach', 'plains', 'grassland', 'forest', 'hills', 'mountain', 'desert', 'snow', 'bridge'];
-        
+        const textureSize = 56; // oversized for softer, organic edges
+
         biomes.forEach(biome => {
             // Create 4 variants per biome for variety
             for (let variant = 0; variant < 4; variant++) {
                 const graphics = scene.add.graphics();
-                
+
                 switch (biome) {
                     case 'water':
-                        this.drawWater(graphics, 0, 0, 32, variant, variant);
+                        this.drawWater(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'river':
-                        this.drawRiver(graphics, 0, 0, 32, variant, variant);
+                        this.drawRiver(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'beach':
-                        this.drawBeach(graphics, 0, 0, 32, variant, variant);
+                        this.drawBeach(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'plains':
-                        this.drawPlains(graphics, 0, 0, 32, variant, variant);
+                        this.drawPlains(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'grassland':
-                        this.drawGrassland(graphics, 0, 0, 32, variant, variant);
+                        this.drawGrassland(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'forest':
-                        this.drawForest(graphics, 0, 0, 32, variant, variant);
+                        this.drawForest(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'hills':
-                        this.drawHills(graphics, 0, 0, 32, variant, variant);
+                        this.drawHills(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'mountain':
-                        this.drawMountain(graphics, 0, 0, 32, variant, variant);
+                        this.drawMountain(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'desert':
-                        this.drawDesert(graphics, 0, 0, 32, variant, variant);
+                        this.drawDesert(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'snow':
-                        this.drawSnow(graphics, 0, 0, 32, variant, variant);
+                        this.drawSnow(graphics, 0, 0, textureSize, variant, variant);
                         break;
                     case 'bridge':
-                        this.drawBridge(graphics, 0, 0, 32, variant, variant);
+                        this.drawBridge(graphics, 0, 0, textureSize, variant, variant);
                         break;
                 }
-                
-                graphics.generateTexture(`tile_${biome}_${variant}`, 32, 32);
+
+                graphics.generateTexture(`tile_${biome}_${variant}`, textureSize, textureSize);
                 graphics.destroy();
             }
         });
-        
+
         this.texturesGenerated = true;
     }
     
@@ -242,214 +293,237 @@ class TileRenderer {
         const tileSize = 32;
         const baseX = x * tileSize;
         const baseY = y * tileSize;
-        
+
         // Use variant based on position for variety
         const variant = (x * 7 + y * 11) % 4;
-        
+
         const tile = scene.add.image(
-            baseX + tileSize/2,
-            baseY + tileSize/2,
+            baseX + tileSize / 2,
+            baseY + tileSize / 2,
             `tile_${biome}_${variant}`
         );
-        tile.setDepth(-50);
+
+        // Slight overscale and tint variation to soften the grid and add painterly feel
+        tile.setDisplaySize(tileSize * 1.35, tileSize * 1.15);
+        tile.setAlpha(0.98);
+        const tintVariation = 0x0c0c0c * ((variant % 2 === 0 ? 1 : -1));
+        tile.setTint(0xffffff + tintVariation);
+
+        tile.setDepth(baseY - 100); // layer based on position for overlap
     }
     
     static drawWater(g, x, y, size, tileX, tileY) {
-        // Deep blue water with waves
-        g.fillGradientStyle(0x1a5490, 0x1a5490, 0x0d3a63, 0x0d3a63, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Animated wave pattern
-        const wave1 = Math.sin((tileX + tileY) * 0.5) * 3;
-        const wave2 = Math.sin((tileX - tileY) * 0.3) * 2;
-        
-        g.fillStyle(0x2874b5, 0.4);
-        g.fillRect(0, size * 0.3 + wave1, size, 3);
-        g.fillRect(0, size * 0.6 + wave2, size, 2);
-        
-        // Foam highlights
-        if ((tileX + tileY) % 5 === 0) {
-            g.fillStyle(0x85c1e9, 0.3);
-            g.fillCircle(size * 0.7, size * 0.3, 4);
+        // Deep teal base with luminous edges for a premium fantasy look
+        this.drawOrganicBase(g, size, 0x0a4d68, 0x0f8fbc, 0x062233, 0.92, this.noise(tileX, tileY));
+
+        // Soft shoreline glow
+        g.lineStyle(4, 0x8be9ff, 0.12);
+        g.strokeEllipse(size * 0.5, size * 0.52, size * 0.85, size * 0.72);
+
+        // Layered wave streaks
+        g.lineStyle(2, 0xb9ecff, 0.25);
+        const offset = (tileX * 3 + tileY * 5) % 10;
+        for (let i = 0; i < 3; i++) {
+            const yPos = size * 0.35 + i * 6 + offset * 0.2;
+            g.beginPath();
+            g.moveTo(size * 0.2, yPos);
+            g.quadraticCurveTo(size * 0.5, yPos + 3, size * 0.8, yPos - 1);
+            g.strokePath();
         }
-    }
-    
-    static drawRiver(g, x, y, size, tileX, tileY) {
-        // Lighter blue for rivers
-        g.fillGradientStyle(0x3498db, 0x3498db, 0x2980b9, 0x2980b9, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Flow lines
-        g.fillStyle(0x5dade2, 0.5);
-        const flow = tileY * 2;
-        g.fillRect(0, (flow % size), size, 2);
-        g.fillRect(0, ((flow + 15) % size), size, 1);
-        
-        // Sparkles
-        if ((tileX * tileY) % 7 === 0) {
-            g.fillStyle(0xffffff, 0.6);
-            g.fillCircle(size * 0.3, size * 0.4, 2);
-        }
-    }
-    
-    static drawBeach(g, x, y, size, tileX, tileY) {
-        // Sandy gradient
-        g.fillGradientStyle(0xf4d03f, 0xf4d03f, 0xe9c46a, 0xe67e22, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Sand texture
-        for (let i = 0; i < 8; i++) {
-            g.fillStyle(0xf1c40f, 0.2);
-            const px = ((tileX + i) * 13) % size;
-            const py = ((tileY + i) * 17) % size;
-            g.fillCircle(px, py, 1);
-        }
-        
-        // Shells
-        if (tileX % 5 === 0) {
-            g.fillStyle(0xffffff, 0.6);
-            g.fillCircle(size * 0.6, size * 0.4, 3);
-        }
-    }
-    
-    static drawPlains(g, x, y, size, tileX, tileY) {
-        // Light green grass
-        g.fillGradientStyle(0x52c234, 0x52c234, 0x45a329, 0x3d8b21, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Grass blades
-        g.fillStyle(0x5dce3e, 0.4);
-        for (let i = 0; i < 6; i++) {
-            const gx = ((tileX + i) * 11) % size;
-            const gy = size - 6 + Math.sin(tileX + i) * 2;
-            g.fillRect(gx, gy, 1, 6);
-        }
-        
-        // Flowers
-        if ((tileX + tileY) % 11 === 0) {
-            g.fillStyle(0xff69b4, 0.8);
-            g.fillCircle(size * 0.7, size * 0.3, 2);
-        }
-    }
-    
-    static drawGrassland(g, x, y, size, tileX, tileY) {
-        // Rich grass
-        g.fillGradientStyle(0x27ae60, 0x27ae60, 0x229954, 0x1e7d45, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Dark grass patches
-        const pattern = (tileX * tileY) % 4;
-        g.fillStyle(0x1e8449, 0.3);
-        if (pattern === 0) {
-            g.fillRect(size * 0.5, 0, size * 0.5, size * 0.5);
-        }
-        
-        // Tall grass
-        g.fillStyle(0x2ecc71, 0.5);
+
+        // Sparkling caustics
+        g.fillStyle(0xffffff, 0.18);
         for (let i = 0; i < 4; i++) {
-            const gx = ((tileX * 7 + i) * 13) % size;
-            g.fillRect(gx, size - 4, 2, 4);
+            const px = ((tileX + i * 3) * 17) % size;
+            const py = ((tileY + i * 5) * 19) % size;
+            g.fillCircle(px, py, 2);
         }
     }
-    
-    static drawForest(g, x, y, size, tileX, tileY) {
-        // Dark forest floor
-        g.fillGradientStyle(0x196f3d, 0x196f3d, 0x145a32, 0x0e3d23, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Undergrowth
-        g.fillStyle(0x229954, 0.5);
-        g.fillRect(0, size * 0.7, size, size * 0.3);
-        
-        // Shadows
-        g.fillStyle(0x0b2e13, 0.4);
-        g.fillCircle(size/2, size/2, 12);
-    }
-    
-    static drawHills(g, x, y, size, tileX, tileY) {
-        // Earthy browns
-        g.fillGradientStyle(0x7d6608, 0x7d6608, 0x6e5a07, 0x5d4a06, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Hill contours
-        g.lineStyle(2, 0x8b7209, 0.4);
-        const curve = Math.sin(tileX * 0.3) * 6;
-        g.strokeRect(0, size * 0.4 + curve, size, 2);
-        
-        // Grass on hills
-        g.fillStyle(0x52c234, 0.5);
-        g.fillRect(0, 0, size, size * 0.3);
-    }
-    
-    static drawMountain(g, x, y, size, tileX, tileY) {
-        // Rocky gray
-        g.fillGradientStyle(0x566573, 0x566573, 0x34495e, 0x2c3e50, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Rock face
-        g.fillStyle(0x273746, 0.6);
+
+    static drawRiver(g, x, y, size, tileX, tileY) {
+        // Brighter aqua rivers with shimmer
+        this.drawOrganicBase(g, size, 0x0b7894, 0x22b4d9, 0x063b52, 0.9, this.noise(tileX, tileY));
+
+        g.lineStyle(2, 0xc7f5ff, 0.4);
+        const flow = (tileY + tileX) * 1.5;
         g.beginPath();
-        g.moveTo(0, size);
-        g.lineTo(size * 0.5, size * 0.2);
-        g.lineTo(size, size);
+        g.moveTo(size * 0.15, size * 0.2 + flow % 5);
+        g.quadraticCurveTo(size * 0.4, size * 0.5, size * 0.85, size * 0.8);
+        g.strokePath();
+
+        // Small highlights
+        g.fillStyle(0xffffff, 0.15);
+        g.fillEllipse(size * 0.35, size * 0.45, 6, 3);
+        g.fillEllipse(size * 0.6, size * 0.65, 4, 2);
+    }
+
+    static drawBeach(g, x, y, size, tileX, tileY) {
+        // Warm sand with sun-kissed rim
+        this.drawOrganicBase(g, size, 0xf2d7a6, 0xf9e8b0, 0xd3a664, 0.95, this.noise(tileX, tileY));
+
+        // Rippled dunes
+        g.lineStyle(1, 0xe5c28f, 0.35);
+        for (let i = 0; i < 3; i++) {
+            const yPos = size * (0.35 + i * 0.18);
+            g.beginPath();
+            g.moveTo(size * 0.1, yPos);
+            g.quadraticCurveTo(size * 0.4, yPos + 3, size * 0.9, yPos - 2);
+            g.strokePath();
+        }
+
+        // Shells and stones
+        g.fillStyle(0xffffff, 0.5);
+        if ((tileX + tileY) % 3 === 0) {
+            g.fillEllipse(size * 0.65, size * 0.55, 4, 3);
+        }
+        g.fillStyle(0xd9b382, 0.35);
+        g.fillCircle(size * 0.35, size * 0.35, 2);
+    }
+
+    static drawPlains(g, x, y, size, tileX, tileY) {
+        // Pastel meadow base
+        this.drawOrganicBase(g, size, 0x7ac67d, 0x9ce29f, 0x4f9255, 0.94, this.noise(tileX, tileY));
+
+        // Gentle color shifts
+        g.fillStyle(0xb6f2bb, 0.35);
+        g.fillEllipse(size * 0.6, size * 0.4, 18, 10);
+
+        // Flower dots
+        g.fillStyle(0xffb7e0, 0.6);
+        if ((tileX + tileY) % 2 === 0) {
+            g.fillCircle(size * 0.35, size * 0.65, 2);
+        }
+    }
+
+    static drawGrassland(g, x, y, size, tileX, tileY) {
+        // Rich, saturated greens for the core kingdom look
+        this.drawOrganicBase(g, size, 0x4fa152, 0x7ad87d, 0x2b5e34, 0.95, this.noise(tileX, tileY));
+
+        // Blade clusters
+        g.fillStyle(0x9cf3a1, 0.45);
+        for (let i = 0; i < 5; i++) {
+            const gx = ((tileX * 13 + i * 7) % size);
+            const gy = size * 0.55 + (i % 2) * 4;
+            g.fillRect(gx, gy, 2, 12);
+        }
+
+        // Dew sparkle
+        g.fillStyle(0xffffff, 0.2);
+        g.fillCircle(size * 0.65, size * 0.35, 2);
+    }
+
+    static drawForest(g, x, y, size, tileX, tileY) {
+        // Deep forest floor with emerald canopy glow
+        this.drawOrganicBase(g, size, 0x234d31, 0x2d7a45, 0x112818, 0.96, this.noise(tileX, tileY));
+
+        // Undergrowth shadows
+        g.fillStyle(0x0f1f15, 0.45);
+        g.fillEllipse(size * 0.52, size * 0.58, size * 0.62, size * 0.38);
+
+        // Leaf speckles
+        g.fillStyle(0x58c777, 0.35);
+        for (let i = 0; i < 4; i++) {
+            const px = ((tileX + i * 2) * 19) % size;
+            const py = ((tileY + i * 3) * 23) % size;
+            g.fillCircle(px, py, 2);
+        }
+    }
+
+    static drawHills(g, x, y, size, tileX, tileY) {
+        // Gentle golden hills with grassy crowns
+        this.drawOrganicBase(g, size, 0x8a6d3b, 0xb2894d, 0x5a452a, 0.93, this.noise(tileX, tileY));
+
+        g.fillStyle(0xc6a060, 0.45);
+        const roll = Math.sin(tileX * 0.4 + tileY * 0.2) * 6;
+        g.fillEllipse(size * 0.5, size * 0.55 + roll, size * 0.8, size * 0.4);
+
+        g.fillStyle(0x6cbf6f, 0.5);
+        g.fillEllipse(size * 0.5, size * 0.35, size * 0.7, size * 0.25);
+    }
+
+    static drawMountain(g, x, y, size, tileX, tileY) {
+        // Painted slate with icy cap
+        this.drawOrganicBase(g, size, 0x4e5666, 0x7a8598, 0x1f232c, 0.94, this.noise(tileX, tileY));
+
+        g.fillStyle(0x2f3643, 0.55);
+        g.beginPath();
+        g.moveTo(size * 0.2, size * 0.75);
+        g.lineTo(size * 0.5, size * 0.25);
+        g.lineTo(size * 0.8, size * 0.78);
         g.closePath();
         g.fillPath();
-        
-        // Snow cap
-        if (tileY < 2) {
-            g.fillStyle(0xffffff, 0.8);
-            g.fillTriangle(size * 0.4, size * 0.3, size * 0.5, size * 0.2, size * 0.6, size * 0.3);
-        }
+
+        g.fillStyle(0xe8efff, 0.9);
+        g.fillTriangle(size * 0.45, size * 0.35, size * 0.5, size * 0.28, size * 0.55, size * 0.36);
     }
-    
+
     static drawDesert(g, x, y, size, tileX, tileY) {
-        // Sandy yellows
-        g.fillGradientStyle(0xf39c12, 0xf39c12, 0xe67e22, 0xd35400, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Sand dunes
-        g.fillStyle(0xd68910, 0.4);
-        const dune = Math.sin(tileX * 0.4) * 8;
-        g.fillEllipse(size * 0.5, size * 0.5 + dune, size * 0.6, size * 0.3);
-        
-        // Sand ripples
-        g.lineStyle(1, 0xca6f1e, 0.3);
-        g.strokeRect(0, size/2, size, 1);
+        // Lush desert palette inspired by illustrated strategy maps
+        this.drawOrganicBase(g, size, 0xd5a043, 0xf1c87c, 0x8f5c1f, 0.93, this.noise(tileX, tileY));
+
+        // Wind streaks
+        g.lineStyle(1, 0xf7dba8, 0.5);
+        const drift = Math.sin(tileX * 0.3 + tileY * 0.5) * 4;
+        g.beginPath();
+        g.moveTo(size * 0.15, size * 0.55 + drift);
+        g.quadraticCurveTo(size * 0.45, size * 0.45 + drift, size * 0.85, size * 0.6 + drift);
+        g.strokePath();
+
+        g.fillStyle(0xf2dea7, 0.4);
+        g.fillEllipse(size * 0.55, size * 0.35, size * 0.35, size * 0.18);
     }
-    
+
     static drawSnow(g, x, y, size, tileX, tileY) {
-        // Pure white snow
-        g.fillGradientStyle(0xffffff, 0xffffff, 0xecf0f1, 0xd5dbdb, 1);
-        g.fillRect(0, 0, size, size);
-        
-        // Snow drifts
-        g.fillStyle(0xe8f4f8, 0.6);
-        const drift = Math.sin(tileX * 0.5) * 4;
-        g.fillEllipse(size * 0.5, size * 0.7 + drift, size * 0.7, size * 0.4);
-        
-        // Sparkles
-        for (let i = 0; i < 3; i++) {
-            g.fillStyle(0xffffff, 0.9);
-            const sx = ((tileX + i) * 7) % size;
-            const sy = ((tileY + i) * 11) % size;
-            g.fillCircle(sx, sy, 1);
+        // Cool blue-white tundra
+        this.drawOrganicBase(g, size, 0xe9f1ff, 0xffffff, 0xc6d4e8, 0.95, this.noise(tileX, tileY));
+
+        // Frost ripples
+        g.lineStyle(1, 0xdde9fb, 0.5);
+        for (let i = 0; i < 2; i++) {
+            const yPos = size * (0.4 + i * 0.18);
+            g.beginPath();
+            g.moveTo(size * 0.15, yPos);
+            g.quadraticCurveTo(size * 0.5, yPos + 3, size * 0.85, yPos - 2);
+            g.strokePath();
+        }
+
+        g.fillStyle(0xffffff, 0.35);
+        g.fillCircle(size * 0.4, size * 0.35, 2);
+        g.fillCircle(size * 0.65, size * 0.55, 2);
+    }
+
+    static drawBridge(g, x, y, size, tileX, tileY) {
+        // Premium timber over shimmering water
+        this.drawOrganicBase(g, size, 0x0a4d68, 0x0f8fbc, 0x062233, 0.85, this.noise(tileX, tileY));
+
+        // Underlay plank shadow
+        g.fillStyle(0x1b0f07, 0.35);
+        g.fillRoundedRect(size * 0.08, size * 0.38, size * 0.84, size * 0.28, 6);
+
+        // Bridge boards
+        g.fillStyle(0x8b5a2b, 0.95);
+        g.fillRoundedRect(size * 0.08, size * 0.32, size * 0.84, size * 0.32, 8);
+        g.lineStyle(2, 0xe2c7a5, 0.6);
+        for (let i = 0; i < 5; i++) {
+            const xPos = size * 0.12 + i * (size * 0.15);
+            g.strokeLineShape(new Phaser.Geom.Line(xPos, size * 0.34, xPos, size * 0.62));
         }
     }
-    
-    static drawBridge(g, x, y, size, tileX, tileY) {
-        // Water underneath
-        g.fillStyle(0x3498db);
-        g.fillRect(0, 0, size, size);
-        
-        // Wooden bridge
-        g.fillStyle(0x8b4513);
-        g.fillRect(0, size * 0.3, size, size * 0.4);
-        
-        // Planks
-        g.fillStyle(0x654321, 0.5);
-        for (let i = 0; i < 5; i++) {
-            g.fillRect(i * size/5, size * 0.3, 2, size * 0.4);
-        }
+
+    static drawOrganicBase(g, size, midColor, highlightColor, shadowColor, alpha, seed) {
+        // Core oval patch with painterly gradients
+        g.fillStyle(midColor, alpha);
+        g.fillEllipse(size * 0.52 + seed * 1.5, size * 0.52 - seed * 1.5, size * 0.9, size * 0.78);
+
+        g.fillStyle(highlightColor, 0.5);
+        g.fillEllipse(size * 0.48, size * 0.42, size * 0.68, size * 0.5);
+
+        g.fillStyle(shadowColor, 0.35);
+        g.fillEllipse(size * 0.55, size * 0.62, size * 0.92, size * 0.55);
+
+        // Irregular rim to hide grid edges
+        g.lineStyle(4, shadowColor, 0.22);
+        g.strokeEllipse(size * 0.52, size * 0.52, size * 0.95, size * 0.85);
     }
 }
 
@@ -733,7 +807,7 @@ class GameScene extends Phaser.Scene {
     create() {
         this.player = new Player('warrior');
         window.gamePlayer = this.player;
-        
+
         // Generate sprites
         SpriteGenerator.createCharacterSprite(this, 'warrior');
         SpriteGenerator.createCharacterSprite(this, 'mage');
@@ -750,20 +824,25 @@ class GameScene extends Phaser.Scene {
         SpriteGenerator.createParticle(this, 0x00ff00);
         SpriteGenerator.createParticle(this, 0x0000ff);
         SpriteGenerator.createParticle(this, 0xffd700);
-        
+
+        TileRenderer.generateBackdropTextures(this);
+        this.createParallaxBackdrop();
+
         this.createMassiveWorld();
         this.createPlayerSprite();
         this.placeQuestMarkers();
-        
+
+        this.createAtmosphericEffects();
+
         this.cursors = this.input.keyboard.createCursorKeys();
         this.actionKey = this.input.keyboard.addKey('SPACE');
-        
+
         this.connectWebSocket();
         
         updateUI();
         showMessage('🗡️ Chronicles of the Shattered Crown - Explore the vast world!', 'cyan');
     }
-    
+
     createMassiveWorld() {
         // MASSIVE WORLD - 300x300 tiles (STATIC MAP)
         this.worldWidth = 300;
@@ -788,6 +867,26 @@ class GameScene extends Phaser.Scene {
         // this.placeQuestMarkers();
         
         console.log('Static world loaded!');
+    }
+
+    createParallaxBackdrop() {
+        const viewWidth = this.cameras.main.width;
+        const viewHeight = this.cameras.main.height;
+
+        this.backgroundSky = this.add.image(0, 0, 'bg_sky_gradient').setOrigin(0, 0);
+        this.backgroundSky.setScrollFactor(0);
+        this.backgroundSky.setDepth(-300);
+
+        this.backgroundMountains = this.add.image(-200, viewHeight * 0.05, 'bg_mountains').setOrigin(0, 0);
+        this.backgroundMountains.setScrollFactor(0.12);
+        this.backgroundMountains.setDepth(-250);
+
+        this.cloudLayer = this.add.tileSprite(viewWidth / 2, viewHeight * 0.25, viewWidth * 2, viewHeight, 'bg_clouds');
+        this.cloudLayer.setScrollFactor(0.05);
+        this.cloudLayer.setDepth(-200);
+        this.cloudLayer.setAlpha(0.6);
+
+        this.cameras.main.setBackgroundColor('#0d1b2a');
     }
     
     renderStaticWorld() {
@@ -1275,6 +1374,62 @@ class GameScene extends Phaser.Scene {
             sign.setDepth(20);
         }
     }
+
+    createAtmosphericEffects() {
+        this.atmosphereBiome = null;
+        this.atmosphereParticles = this.add.particles('atmos_particle');
+        this.atmosphereParticles.setDepth(60);
+
+        this.atmosEmitter = this.atmosphereParticles.createEmitter({
+            x: this.cameras.main.centerX,
+            y: this.cameras.main.centerY,
+            speed: { min: -20, max: 20 },
+            angle: { min: 0, max: 360 },
+            alpha: { start: 0.7, end: 0 },
+            scale: { start: 0.8, end: 0.2 },
+            lifespan: 4500,
+            quantity: 3,
+            frequency: 160,
+            blendMode: 'ADD',
+            emitZone: { source: new Phaser.Geom.Rectangle(-450, -320, 900, 640), type: 'random', quantity: 4 }
+        });
+
+        this.updateAtmosphereForBiome('grassland');
+    }
+
+    updateAtmospherePosition() {
+        if (!this.atmosEmitter) return;
+        this.atmosEmitter.setPosition(
+            this.cameras.main.scrollX + this.cameras.main.width / 2,
+            this.cameras.main.scrollY + this.cameras.main.height / 2
+        );
+    }
+
+    updateAtmosphereForBiome(biome) {
+        if (!this.atmosEmitter || this.atmosphereBiome === biome) return;
+
+        const settings = {
+            forest: { tint: 0x9ae6b4, speed: 18, quantity: 5, lifespan: 5200, frequency: 110 },
+            mountain: { tint: 0xd6d9e0, speed: 14, quantity: 4, lifespan: 6000, frequency: 140 },
+            desert: { tint: 0xffd39a, speed: 10, quantity: 3, lifespan: 4200, frequency: 180 },
+            snow: { tint: 0xe6f7ff, speed: 12, quantity: 6, lifespan: 7000, frequency: 90 },
+            water: { tint: 0xa6ddff, speed: 22, quantity: 5, lifespan: 5000, frequency: 120 },
+            river: { tint: 0xa6ddff, speed: 22, quantity: 5, lifespan: 5000, frequency: 120 },
+            beach: { tint: 0xffefc2, speed: 14, quantity: 4, lifespan: 4600, frequency: 150 },
+            hills: { tint: 0xb4f0c3, speed: 16, quantity: 4, lifespan: 5200, frequency: 140 },
+            default: { tint: 0xc8e6ff, speed: 16, quantity: 4, lifespan: 5200, frequency: 150 }
+        };
+
+        const biomeSettings = settings[biome] || settings.default;
+
+        this.atmosEmitter.setTint(biomeSettings.tint);
+        this.atmosEmitter.setSpeed({ min: -biomeSettings.speed, max: biomeSettings.speed });
+        this.atmosEmitter.setQuantity(biomeSettings.quantity);
+        this.atmosEmitter.setLifespan(biomeSettings.lifespan);
+        this.atmosEmitter.setFrequency(biomeSettings.frequency);
+
+        this.atmosphereBiome = biome;
+    }
     
     placeQuestMarkers() {
         if (!this.playerSprite) { console.warn("placeQuestMarkers called before player sprite exists"); return; }
@@ -1386,7 +1541,7 @@ class GameScene extends Phaser.Scene {
         
         if (tileY >= 0 && tileY < this.worldHeight && tileX >= 0 && tileX < this.worldWidth) {
             const biome = this.worldMap[tileY][tileX];
-            
+
             // Varied encounter rates by biome
             let encounterRate = 0.0005;
             if (biome === 'forest') encounterRate = 0.0012;
@@ -1398,7 +1553,16 @@ class GameScene extends Phaser.Scene {
             if (Math.random() < encounterRate && !this.inCombat) {
                 this.startRandomEncounter();
             }
+
+            this.updateAtmosphereForBiome(biome);
         }
+
+        if (this.cloudLayer) {
+            this.cloudLayer.tilePositionX += 0.15;
+            this.cloudLayer.tilePositionY += 0.02;
+        }
+
+        this.updateAtmospherePosition();
     }
     
     startRandomEncounter() {
