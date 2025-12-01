@@ -183,7 +183,53 @@ class StaticWorldMap {
 // ===== TILE RENDERER =====
 class TileRenderer {
     static texturesGenerated = false;
-    
+    static backdropGenerated = false;
+
+    static generateBackdropTextures(scene) {
+        if (this.backdropGenerated) return;
+
+        const width = 1024;
+        const height = 768;
+
+        // Sky gradient
+        const sky = scene.add.graphics();
+        sky.fillGradientStyle(0x1b263b, 0x1b263b, 0x0d1b2a, 0x0d1b2a, 1);
+        sky.fillRect(0, 0, width, height);
+        sky.generateTexture('bg_sky_gradient', width, height);
+        sky.destroy();
+
+        // Distant mountains for parallax depth
+        const mountains = scene.add.graphics();
+        mountains.fillStyle(0x1f4068, 1);
+        mountains.fillTriangle(0, height, width * 0.2, height * 0.45, width * 0.4, height);
+        mountains.fillTriangle(width * 0.25, height, width * 0.55, height * 0.38, width * 0.85, height);
+        mountains.fillTriangle(width * 0.6, height, width * 0.85, height * 0.5, width, height);
+        mountains.generateTexture('bg_mountains', width, height);
+        mountains.destroy();
+
+        // Soft clouds for slow parallax drift
+        const clouds = scene.add.graphics();
+        clouds.fillStyle(0xffffff, 0.8);
+        for (let i = 0; i < 6; i++) {
+            const cx = 120 + i * 140;
+            const cy = 120 + Math.sin(i) * 40;
+            clouds.fillEllipse(cx, cy, 180, 70);
+            clouds.fillEllipse(cx + 50, cy + 10, 160, 60);
+            clouds.fillEllipse(cx - 60, cy + 6, 140, 50);
+        }
+        clouds.generateTexture('bg_clouds', width, height / 2);
+        clouds.destroy();
+
+        // Atmospheric particle texture
+        const particle = scene.add.graphics();
+        particle.fillStyle(0xffffff, 1);
+        particle.fillCircle(4, 4, 4);
+        particle.generateTexture('atmos_particle', 8, 8);
+        particle.destroy();
+
+        this.backdropGenerated = true;
+    }
+
     static generateAllTextures(scene) {
         if (this.texturesGenerated) return;
         
@@ -733,7 +779,7 @@ class GameScene extends Phaser.Scene {
     create() {
         this.player = new Player('warrior');
         window.gamePlayer = this.player;
-        
+
         // Generate sprites
         SpriteGenerator.createCharacterSprite(this, 'warrior');
         SpriteGenerator.createCharacterSprite(this, 'mage');
@@ -750,20 +796,25 @@ class GameScene extends Phaser.Scene {
         SpriteGenerator.createParticle(this, 0x00ff00);
         SpriteGenerator.createParticle(this, 0x0000ff);
         SpriteGenerator.createParticle(this, 0xffd700);
-        
+
+        TileRenderer.generateBackdropTextures(this);
+        this.createParallaxBackdrop();
+
         this.createMassiveWorld();
         this.createPlayerSprite();
         this.placeQuestMarkers();
-        
+
+        this.createAtmosphericEffects();
+
         this.cursors = this.input.keyboard.createCursorKeys();
         this.actionKey = this.input.keyboard.addKey('SPACE');
-        
+
         this.connectWebSocket();
         
         updateUI();
         showMessage('🗡️ Chronicles of the Shattered Crown - Explore the vast world!', 'cyan');
     }
-    
+
     createMassiveWorld() {
         // MASSIVE WORLD - 300x300 tiles (STATIC MAP)
         this.worldWidth = 300;
@@ -788,6 +839,26 @@ class GameScene extends Phaser.Scene {
         // this.placeQuestMarkers();
         
         console.log('Static world loaded!');
+    }
+
+    createParallaxBackdrop() {
+        const viewWidth = this.cameras.main.width;
+        const viewHeight = this.cameras.main.height;
+
+        this.backgroundSky = this.add.image(0, 0, 'bg_sky_gradient').setOrigin(0, 0);
+        this.backgroundSky.setScrollFactor(0);
+        this.backgroundSky.setDepth(-300);
+
+        this.backgroundMountains = this.add.image(-200, viewHeight * 0.05, 'bg_mountains').setOrigin(0, 0);
+        this.backgroundMountains.setScrollFactor(0.12);
+        this.backgroundMountains.setDepth(-250);
+
+        this.cloudLayer = this.add.tileSprite(viewWidth / 2, viewHeight * 0.25, viewWidth * 2, viewHeight, 'bg_clouds');
+        this.cloudLayer.setScrollFactor(0.05);
+        this.cloudLayer.setDepth(-200);
+        this.cloudLayer.setAlpha(0.6);
+
+        this.cameras.main.setBackgroundColor('#0d1b2a');
     }
     
     renderStaticWorld() {
@@ -1275,6 +1346,62 @@ class GameScene extends Phaser.Scene {
             sign.setDepth(20);
         }
     }
+
+    createAtmosphericEffects() {
+        this.atmosphereBiome = null;
+        this.atmosphereParticles = this.add.particles('atmos_particle');
+        this.atmosphereParticles.setDepth(60);
+
+        this.atmosEmitter = this.atmosphereParticles.createEmitter({
+            x: this.cameras.main.centerX,
+            y: this.cameras.main.centerY,
+            speed: { min: -20, max: 20 },
+            angle: { min: 0, max: 360 },
+            alpha: { start: 0.7, end: 0 },
+            scale: { start: 0.8, end: 0.2 },
+            lifespan: 4500,
+            quantity: 3,
+            frequency: 160,
+            blendMode: 'ADD',
+            emitZone: { source: new Phaser.Geom.Rectangle(-450, -320, 900, 640), type: 'random', quantity: 4 }
+        });
+
+        this.updateAtmosphereForBiome('grassland');
+    }
+
+    updateAtmospherePosition() {
+        if (!this.atmosEmitter) return;
+        this.atmosEmitter.setPosition(
+            this.cameras.main.scrollX + this.cameras.main.width / 2,
+            this.cameras.main.scrollY + this.cameras.main.height / 2
+        );
+    }
+
+    updateAtmosphereForBiome(biome) {
+        if (!this.atmosEmitter || this.atmosphereBiome === biome) return;
+
+        const settings = {
+            forest: { tint: 0x9ae6b4, speed: 18, quantity: 5, lifespan: 5200, frequency: 110 },
+            mountain: { tint: 0xd6d9e0, speed: 14, quantity: 4, lifespan: 6000, frequency: 140 },
+            desert: { tint: 0xffd39a, speed: 10, quantity: 3, lifespan: 4200, frequency: 180 },
+            snow: { tint: 0xe6f7ff, speed: 12, quantity: 6, lifespan: 7000, frequency: 90 },
+            water: { tint: 0xa6ddff, speed: 22, quantity: 5, lifespan: 5000, frequency: 120 },
+            river: { tint: 0xa6ddff, speed: 22, quantity: 5, lifespan: 5000, frequency: 120 },
+            beach: { tint: 0xffefc2, speed: 14, quantity: 4, lifespan: 4600, frequency: 150 },
+            hills: { tint: 0xb4f0c3, speed: 16, quantity: 4, lifespan: 5200, frequency: 140 },
+            default: { tint: 0xc8e6ff, speed: 16, quantity: 4, lifespan: 5200, frequency: 150 }
+        };
+
+        const biomeSettings = settings[biome] || settings.default;
+
+        this.atmosEmitter.setTint(biomeSettings.tint);
+        this.atmosEmitter.setSpeed({ min: -biomeSettings.speed, max: biomeSettings.speed });
+        this.atmosEmitter.setQuantity(biomeSettings.quantity);
+        this.atmosEmitter.setLifespan(biomeSettings.lifespan);
+        this.atmosEmitter.setFrequency(biomeSettings.frequency);
+
+        this.atmosphereBiome = biome;
+    }
     
     placeQuestMarkers() {
         if (!this.playerSprite) { console.warn("placeQuestMarkers called before player sprite exists"); return; }
@@ -1386,7 +1513,7 @@ class GameScene extends Phaser.Scene {
         
         if (tileY >= 0 && tileY < this.worldHeight && tileX >= 0 && tileX < this.worldWidth) {
             const biome = this.worldMap[tileY][tileX];
-            
+
             // Varied encounter rates by biome
             let encounterRate = 0.0005;
             if (biome === 'forest') encounterRate = 0.0012;
@@ -1398,7 +1525,16 @@ class GameScene extends Phaser.Scene {
             if (Math.random() < encounterRate && !this.inCombat) {
                 this.startRandomEncounter();
             }
+
+            this.updateAtmosphereForBiome(biome);
         }
+
+        if (this.cloudLayer) {
+            this.cloudLayer.tilePositionX += 0.15;
+            this.cloudLayer.tilePositionY += 0.02;
+        }
+
+        this.updateAtmospherePosition();
     }
     
     startRandomEncounter() {
