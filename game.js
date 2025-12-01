@@ -804,10 +804,52 @@ class GameScene extends Phaser.Scene {
         this.createPlayerSprite();
         this.placeQuestMarkers();
 
-        this.createAtmosphericEffects();
-
         this.cursors = this.input.keyboard.createCursorKeys();
         this.actionKey = this.input.keyboard.addKey('SPACE');
+
+        // ==== GAMEPAD SUPPORT ====
+        this.gamepad = null;
+        this.input.gamepad.once('connected', (pad) => {
+            console.log('Gamepad connected:', pad.id);
+            this.gamepad = pad;
+        });
+        if (this.input.gamepad.total) {
+            this.gamepad = this.input.gamepad.gamepads[0];
+            console.log('Using already connected gamepad:', this.gamepad.id);
+        }
+
+        // ==== TOUCH / MOBILE CONTROLS ====
+        this.touchInput = {
+            active: false,
+            startX: 0,
+            startY: 0,
+            dx: 0,
+            dy: 0
+        };
+
+        this.input.on('pointerdown', (pointer) => {
+            // Ignore right-click mouse
+            if (pointer.rightButtonDown && pointer.rightButtonDown()) {
+                return;
+            }
+            this.touchInput.active = true;
+            this.touchInput.startX = pointer.x;
+            this.touchInput.startY = pointer.y;
+            this.touchInput.dx = 0;
+            this.touchInput.dy = 0;
+        });
+
+        this.input.on('pointermove', (pointer) => {
+            if (!this.touchInput.active) return;
+            this.touchInput.dx = pointer.x - this.touchInput.startX;
+            this.touchInput.dy = pointer.y - this.touchInput.startY;
+        });
+
+        this.input.on('pointerup', () => {
+            this.touchInput.active = false;
+            this.touchInput.dx = 0;
+            this.touchInput.dy = 0;
+        });
 
         this.connectWebSocket();
         
@@ -1475,39 +1517,93 @@ class GameScene extends Phaser.Scene {
     
     update() {
         if (this.inCombat) return;
-        
+        if (!this.playerSprite || !this.playerSprite.body) return;
+
         const speed = 200;
+
+        // Reset velocity each frame
         this.playerSprite.body.setVelocity(0);
-        
-        let moving = false;
+
+        let dirX = 0;
+        let dirY = 0;
+
+        // ===== KEYBOARD (ARROW KEYS) =====
         if (this.cursors.left.isDown) {
-            this.playerSprite.body.setVelocityX(-speed);
-            this.playerSprite.setFlipX(true);
-            moving = true;
-        } else if (this.cursors.right.isDown) {
-            this.playerSprite.body.setVelocityX(speed);
-            this.playerSprite.setFlipX(false);
-            moving = true;
+            dirX -= 1;
         }
-        
+        if (this.cursors.right.isDown) {
+            dirX += 1;
+        }
         if (this.cursors.up.isDown) {
-            this.playerSprite.body.setVelocityY(-speed);
-            moving = true;
-        } else if (this.cursors.down.isDown) {
-            this.playerSprite.body.setVelocityY(speed);
-            moving = true;
+            dirY -= 1;
         }
-        
+        if (this.cursors.down.isDown) {
+            dirY += 1;
+        }
+
+        // ===== GAMEPAD (LEFT STICK + D-PAD) =====
+        const pad = this.gamepad;
+        if (pad && pad.connected) {
+            const deadZone = 0.2;
+            let axisX = pad.axes.length > 0 ? pad.axes[0].getValue() : 0;
+            let axisY = pad.axes.length > 1 ? pad.axes[1].getValue() : 0;
+
+            if (Math.abs(axisX) < deadZone) axisX = 0;
+            if (Math.abs(axisY) < deadZone) axisY = 0;
+
+            dirX += axisX;
+            dirY += axisY;
+
+            if (pad.left) dirX -= 1;
+            if (pad.right) dirX += 1;
+            if (pad.up) dirY -= 1;
+            if (pad.down) dirY += 1;
+        }
+
+        // ===== TOUCH / MOBILE DRAG JOYSTICK =====
+        if (this.touchInput && this.touchInput.active) {
+            const tx = this.touchInput.dx;
+            const ty = this.touchInput.dy;
+            const len = Math.sqrt(tx * tx + ty * ty);
+
+            // Only move if the drag is significant
+            if (len > 10) {
+                dirX += tx / len;
+                dirY += ty / len;
+            }
+        }
+
+        // ===== APPLY MOVEMENT =====
+        let moving = false;
+        if (dirX === 0 && dirY === 0) {
+            this.playerSprite.body.setVelocity(0, 0);
+        } else {
+            const len = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+            const vx = (dirX / len) * speed;
+            const vy = (dirY / len) * speed;
+
+            this.playerSprite.body.setVelocity(vx, vy);
+            moving = true;
+
+            if (vx < 0) {
+                this.playerSprite.setFlipX(true);
+            } else if (vx > 0) {
+                this.playerSprite.setFlipX(false);
+            }
+        }
+
+        // Little bob when moving
         if (moving) {
             this.playerSprite.y += Math.sin(Date.now() / 100) * 0.6;
         }
-        
+
+        // Keep shadow and glow under the player
         this.playerShadow.x = this.playerSprite.x;
         this.playerShadow.y = this.playerSprite.y + 20;
         this.playerGlow.x = this.playerSprite.x;
         this.playerGlow.y = this.playerSprite.y;
-        
-        // Random encounters based on biome
+
+// Random encounters based on biome
         const tileX = Math.floor(this.playerSprite.x / this.tileSize);
         const tileY = Math.floor(this.playerSprite.y / this.tileSize);
         
@@ -1903,6 +1999,9 @@ const config = {
             gravity: { y: 0 },
             debug: false
         }
+    },
+    input: {
+        gamepad: true
     },
     scene: [GameScene],
     backgroundColor: '#0a0a1e'
