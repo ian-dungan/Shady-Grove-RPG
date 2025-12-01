@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronicles of the Shattered Crown</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+        }
+        #game-container {
+            border: 2px solid #333;
+        }
+        #ui-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            min-width: 250px;
+        }
+        .stat-bar {
+            margin: 5px 0;
+        }
+        .bar {
+            width: 200px;
+            height: 20px;
+            background: #333;
+            border: 1px solid #666;
+            position: relative;
+            margin-top: 3px;
+        }
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        .hp-bar { background: #e74c3c; }
+        .mp-bar { background: #3498db; }
+        .xp-bar { background: #2ecc71; }
+        .menu-button {
+            background: #34495e;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin: 5px 5px 0 0;
+            cursor: pointer;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .menu-button:hover {
+            background: #2c3e50;
+        }
+        #modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            border: 3px solid #666;
+            padding: 30px;
+            border-radius: 10px;
+            color: white;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        #modal.active { display: block; }
+        .modal-close {
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+            color: #e74c3c;
+        }
+        .item-slot {
+            background: #2c3e50;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .item-slot:hover {
+            background: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <div id="ui-overlay">
+        <h3 id="char-name">Hero</h3>
+        <div class="stat-bar">
+            <strong>HP:</strong> <span id="hp-text">100/100</span>
+            <div class="bar"><div id="hp-bar" class="bar-fill hp-bar" style="width: 100%"></div></div>
+        </div>
+        <div class="stat-bar">
+            <strong>MP:</strong> <span id="mp-text">50/50</span>
+            <div class="bar"><div id="mp-bar" class="bar-fill mp-bar" style="width: 100%"></div></div>
+        </div>
+        <div class="stat-bar">
+            <strong>Level:</strong> <span id="level">1</span> | <strong>Gold:</strong> <span id="gold">0</span>
+        </div>
+        <div class="stat-bar">
+            <strong>XP:</strong> <span id="xp-text">0/100</span>
+            <div class="bar"><div id="xp-bar" class="bar-fill xp-bar" style="width: 0%"></div></div>
+        </div>
+        <div style="margin-top: 10px;">
+            <button class="menu-button" onclick="openInventory()">Inventory</button>
+            <button class="menu-button" onclick="openQuests()">Quests</button>
+            <button class="menu-button" onclick="openStats()">Stats</button>
+        </div>
+    </div>
+
+    <div id="modal">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div id="modal-content"></div>
+    </div>
+
+    <script type="module" src="game.js"></script>
+</body>
+</html>
