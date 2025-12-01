@@ -145,7 +145,7 @@ const GameConfig = {
 
     // WebSocket Configuration
     websocket: {
-        url: 'wss://shady-grove-rpg.onrender.com/', // Replace with your Render WebSocket URL
+        url: 'wss://your-render-app.onrender.com', // Replace with your Render WebSocket URL
         reconnectInterval: 3000
     },
 
