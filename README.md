@@ -1,44 +1,35 @@
 # Chronicles of the Shattered Crown - Browser RPG
 
-Complete 2.5D browser-based SNES-style RPG with classes, combat, quests, inventory, and multiplayer.
+Complete 2.5D SNES-style RPG with massive open world, procedural terrain, classes, combat, quests, and multiplayer.
+
+## 🌍 MASSIVE STATIC WORLD
+- **300x300 tiles** = 90,000 explorable tiles!
+- **Hand-crafted static world map** - same every playthrough
+- **9 unique biomes**: Water, Beach, Plains, Grassland, Forest, Hills, Mountains, Desert, Snow
+- **SNES Final Fantasy-style graphics** with detailed tile rendering
+- **2000+ fixed decorations**: Trees, rocks, cacti, ice crystals in consistent locations
+- **8 named locations**: Villages, towns, castles, dungeons, and temples
+- **Randomized monster encounters** - enemies spawn randomly but world is static
+- Quest markers at fixed locations across the continent
 
 ## Quick Start
 
-1. **Deploy Server to Render:**
-   - Upload `server.js` and `package.json` to Render
-   - Set start command: `npm start`
-   - Copy your WebSocket URL
-
-2. **Configure Game:**
-   - Edit `gameConfig.js` line 83
-   - Replace with your Render URL: `url: 'wss://your-app.onrender.com'`
-
-3. **Play:**
-   - Open `index.html` in browser
-   - Or deploy to GitHub Pages
+1. **Deploy Server to Render** (server.js + package.json)
+2. **Update gameConfig.js** with your Render WebSocket URL
+3. **Open index.html** in browser or deploy to GitHub Pages
 
 ## Features
 
-✅ 4 Classes (Warrior/Mage/Rogue/Cleric)
-✅ Turn-based combat
+✅ 4 Classes with unique stats
+✅ Turn-based combat with particles & effects
+✅ Massive explorable world
+✅ Procedural terrain generation
+✅ Full inventory & item system
 ✅ Level/XP/Gold systems
-✅ Full inventory & items
 ✅ 6-quest story campaign
-✅ Random encounters
-✅ Boss fights
-✅ Easy asset swapping
-
-## Files
-
-- `index.html` - Game page
-- `game.js` - Engine with all systems
-- `gameConfig.js` - **Customize everything here**
-- `server.js` - WebSocket server
-- `package.json` - Server deps
-
-## Customize Assets
-
-Edit `gameConfig.js` to swap sprites, items, enemies, quests - everything is config-driven.
+✅ Multiple biomes with varied encounter rates
+✅ Towns, villages, castles
+✅ WebSocket multiplayer ready
 
 ## Controls
 
@@ -46,6 +37,6 @@ Edit `gameConfig.js` to swap sprites, items, enemies, quests - everything is con
 - Space: Action
 - Buttons: Inventory/Quests/Stats
 
-## Story
+## World Size
 
-Retrieve 5 Crown fragments across dungeons to defeat the Dark Lord Malachar and save Eldoria.
+The game world is **300x300 tiles** (9,600 x 9,600 pixels), providing hours of exploration across diverse biomes.

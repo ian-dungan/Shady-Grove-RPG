@@ -88,7 +88,7 @@ const GameConfig = {
                 id: 1,
                 name: "Awaken the Hero",
                 description: "Leave your village and seek the first crown fragment in the Forest of Whispers",
-                location: { x: 5, y: 5 },
+                location: { x: 150, y: 150 },
                 reward: { gold: 100, xp: 50 }
             },
             {
@@ -96,7 +96,7 @@ const GameConfig = {
                 name: "The Forest Fragment",
                 description: "Defeat the Corrupted Guardian in the Forest Dungeon to claim the first fragment",
                 boss: 'orc',
-                location: { x: 15, y: 8 },
+                location: { x: 80, y: 100 },
                 reward: { gold: 200, xp: 150, item: 'ironSword' }
             },
             {
@@ -104,7 +104,7 @@ const GameConfig = {
                 name: "Mountain's Call",
                 description: "Journey to the Frozen Peaks and retrieve the second fragment from the Ice Caverns",
                 boss: 'dragon',
-                location: { x: 25, y: 15 },
+                location: { x: 50, y: 50 },
                 reward: { gold: 500, xp: 300 }
             },
             {
@@ -112,7 +112,7 @@ const GameConfig = {
                 name: "Desert Secrets",
                 description: "Cross the Scorching Wastes and enter the Ancient Pyramid to find the third fragment",
                 boss: 'skeleton',
-                location: { x: 30, y: 25 },
+                location: { x: 200, y: 250 },
                 reward: { gold: 750, xp: 400 }
             },
             {
@@ -120,7 +120,7 @@ const GameConfig = {
                 name: "The Sunken City",
                 description: "Dive into the depths of the Drowned Temple to recover the fourth fragment",
                 boss: 'dragon',
-                location: { x: 10, y: 30 },
+                location: { x: 80, y: 280 },
                 reward: { gold: 1000, xp: 500, item: 'steelSword' }
             },
             {
@@ -128,7 +128,7 @@ const GameConfig = {
                 name: "The Final Confrontation",
                 description: "Storm the Dark Citadel, defeat Malachar, and restore the Crown of Light",
                 boss: 'darkLord',
-                location: { x: 50, y: 50 },
+                location: { x: 270, y: 50 },
                 reward: { gold: 5000, xp: 2000, item: 'legendSword' }
             }
         ]
@@ -145,7 +145,7 @@ const GameConfig = {
 
     // WebSocket Configuration
     websocket: {
-        url: 'wss://shady-grove-rpg.onrender.com/', // Replace with your Render WebSocket URL
+        url: 'wss://your-render-app.onrender.com', // Replace with your Render WebSocket URL
         reconnectInterval: 3000
     },
 
