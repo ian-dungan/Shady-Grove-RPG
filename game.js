@@ -218,7 +218,12 @@ class TileRenderer {
     static texturesGenerated = false;
     static backdropGenerated = false;
 
-    static generateBackdropTextures(scene) {
+    static noise(x, y, seed = 0) {
+        // Reuse world hash noise so tile variation is deterministic and pretty
+        return StaticWorldMap.hashNoise(x, y, seed);
+    }
+
+static generateBackdropTextures(scene) {
         if (this.backdropGenerated) return;
 
         const width = 1024;
