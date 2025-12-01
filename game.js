@@ -4,179 +4,212 @@ import GameConfig from './gameConfig.js';
 class StaticWorldMap {
     static createWorldMap(width, height) {
         const worldMap = [];
-        
-        // Initialize with base terrain
+        const heightMap = this.generateHeightMap(width, height);
+        const moistureMap = this.generateMoistureMap(width, height);
+
         for (let y = 0; y < height; y++) {
             worldMap[y] = [];
             for (let x = 0; x < width; x++) {
-                worldMap[y][x] = this.getBiomeForPosition(x, y, width, height);
+                const h = heightMap[y][x];
+                const m = moistureMap[y][x];
+                worldMap[y][x] = this.pickBiome(h, m, x, y, width, height);
             }
         }
-        
-        // Add rivers
-        this.addRivers(worldMap, width, height);
-        
+
+        this.addRivers(worldMap, heightMap, width, height);
+        this.addBridges(worldMap, width, height);
+
         return worldMap;
     }
-    
-    static addRivers(worldMap, width, height) {
-        // Major river from north mountains to south
-        const riverStartX = 120;
-        let riverX = riverStartX;
-        for (let y = 40; y < 280; y++) {
-            // Meandering river
-            if (y % 20 === 0) {
-                riverX += (Math.random() - 0.5) * 10;
-                riverX = Math.max(15, Math.min(width - 15, riverX));
-            }
-            
-            // River width 3-5 tiles
-            const riverWidth = 3 + Math.floor(Math.random() * 2);
-            for (let dx = 0; dx < riverWidth; dx++) {
-                const x = Math.floor(riverX) + dx - 1;
-                if (x >= 0 && x < width && y >= 0 && y < height) {
-                    if (worldMap[y][x] !== 'water') {
-                        worldMap[y][x] = 'river';
-                    }
-                }
-            }
-        }
-        
-        // Second river from east to west
-        const riverStartY = 180;
-        let riverY = riverStartY;
-        for (let x = 200; x < 280; x++) {
-            if (x % 15 === 0) {
-                riverY += (Math.random() - 0.5) * 8;
-                riverY = Math.max(150, Math.min(210, riverY));
-            }
-            
-            const riverWidth = 2 + Math.floor(Math.random() * 2);
-            for (let dy = 0; dy < riverWidth; dy++) {
-                const y = Math.floor(riverY) + dy;
-                if (x >= 0 && x < width && y >= 0 && y < height) {
-                    if (worldMap[y][x] !== 'water') {
-                        worldMap[y][x] = 'river';
-                    }
-                }
-            }
-        }
-        
-        // Add bridges where roads cross rivers
-        this.addBridge(worldMap, 120, 150, 3, true);  // Vertical bridge
-        this.addBridge(worldMap, 220, 180, 3, false); // Horizontal bridge
-    }
-    
-    static addBridge(worldMap, x, y, length, vertical) {
-        if (vertical) {
-            for (let dy = 0; dy < length; dy++) {
-                if (y + dy < worldMap.length && x < worldMap[0].length) {
-                    worldMap[y + dy][x] = 'bridge';
-                }
-            }
-        } else {
-            for (let dx = 0; dx < length; dx++) {
-                if (y < worldMap.length && x + dx < worldMap[0].length) {
-                    worldMap[y][x + dx] = 'bridge';
-                }
-            }
-        }
-    }
-    
-    static getBiomeForPosition(x, y, width, height) {
+
+    static generateHeightMap(width, height) {
         const centerX = width / 2;
         const centerY = height / 2;
-        
-        // Starting Area - Center (Grassland/Plains)
-        if (this.inCircle(x, y, centerX, centerY, 35)) {
-            return Math.random() < 0.7 ? 'grassland' : 'plains';
-        }
-        
-        // NORTHERN MOUNTAINS - Large mountain range
-        if (y < height * 0.25) {
-            if (y < height * 0.12) {
-                return 'snow';
+        const heightMap = [];
+
+        for (let y = 0; y < height; y++) {
+            heightMap[y] = [];
+            for (let x = 0; x < width; x++) {
+                const nx = (x - centerX) / centerX;
+                const ny = (y - centerY) / centerY;
+                const radialFalloff = Math.max(0, 1 - Math.pow(Math.sqrt(nx * nx + ny * ny) * 1.05, 1.35));
+
+                const broadUndulation = (Math.sin(x * 0.045) + Math.cos(y * 0.055)) * 0.12;
+                const midSwirl = Math.sin((x + y) * 0.12) * Math.cos((x - y) * 0.1) * 0.08;
+                const fineNoise = Math.sin(x * 0.38) * Math.sin(y * 0.32) * 0.03;
+                const ridge = Math.cos((x - centerX) * 0.04) * Math.sin((y - centerY * 0.7) * 0.05) * 0.08;
+
+                // Carve in a crescent bay on the west and a lagoon near center
+                const bay = this.inCircle(x, y, centerX * 0.45, centerY * 1.05, 42) ? -0.25 : 0;
+                const lagoon = this.inCircle(x, y, centerX * 1.12, centerY * 0.95, 28) ? -0.18 : 0;
+
+                const heightValue = radialFalloff * 0.7 + broadUndulation + midSwirl + fineNoise + ridge + bay + lagoon + 0.4;
+                heightMap[y][x] = Phaser.Math.Clamp(heightValue, 0, 1);
             }
-            // Mountain peaks
-            const mountainNoise = Math.sin(x * 0.15) * Math.cos(y * 0.2);
-            if (mountainNoise > 0.3 || y < height * 0.18) {
-                return 'mountain';
-            }
-            return Math.random() < 0.6 ? 'hills' : 'mountain';
         }
-        
-        // SOUTHERN DESERT - Vast desert region
-        if (y > height * 0.72) {
-            return Math.random() < 0.85 ? 'desert' : 'plains';
-        }
-        
-        // WESTERN OCEAN
-        if (x < 12) {
-            return 'water';
-        }
-        if (x < 25) {
-            return (y < height * 0.25 || y > height * 0.7) ? 'beach' : 'plains';
-        }
-        
-        // EASTERN OCEAN  
-        if (x > width - 12) {
-            return 'water';
-        }
-        if (x > width - 25) {
-            return (y < height * 0.25 || y > height * 0.7) ? 'beach' : 'grassland';
-        }
-        
-        // DARK FOREST - Dense western forest
-        if (x < centerX - 25 && y > height * 0.28 && y < centerY + 20) {
-            return 'forest';
-        }
-        
-        // LIGHT FOREST - Eastern forest
-        if (x > centerX + 35 && y > height * 0.28 && y < centerY + 15) {
-            return Math.random() < 0.7 ? 'forest' : 'grassland';
-        }
-        
-        // HILLS REGION - Southwest hills
-        if (x < centerX - 10 && y > centerY + 10 && y < height * 0.7) {
-            return Math.random() < 0.6 ? 'hills' : 'plains';
-        }
-        
-        // MOUNTAIN RANGE - Eastern ridge
-        if (x > width - 70 && x < width - 28 && y > height * 0.22 && y < height * 0.58) {
-            const peakPattern = Math.sin(y * 0.2) * Math.cos(x * 0.15);
-            if (peakPattern > 0.4) {
-                return 'mountain';
-            }
-            return Math.random() < 0.5 ? 'mountain' : 'hills';
-        }
-        
-        // CENTRAL LAKES
-        if (this.inCircle(x, y, centerX + 45, centerY - 25, 14)) {
-            return 'water';
-        }
-        if (this.inCircle(x, y, centerX + 45, centerY - 25, 18)) {
-            return 'beach';
-        }
-        
-        if (this.inCircle(x, y, centerX - 30, centerY + 40, 10)) {
-            return 'water';
-        }
-        if (this.inCircle(x, y, centerX - 30, centerY + 40, 13)) {
-            return 'beach';
-        }
-        
-        // Default grassland/plains mix
-        return Math.random() < 0.6 ? 'grassland' : 'plains';
+
+        return heightMap;
     }
-    
+
+    static generateMoistureMap(width, height) {
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const moistureMap = [];
+
+        for (let y = 0; y < height; y++) {
+            moistureMap[y] = [];
+            for (let x = 0; x < width; x++) {
+                const coastalInfluence = 1 - Math.min(x / width, (width - x) / width) * 2;
+                const valleyPull = this.inCircle(x, y, centerX, centerY, 55) ? 0.35 : 0;
+                const forestBelt = Math.sin((y / height) * Math.PI) * 0.2;
+                const noise = this.hashNoise(x * 0.6, y * 0.6, 99) * 0.25;
+
+                const moisture = Phaser.Math.Clamp(0.35 + coastalInfluence * 0.15 + valleyPull + forestBelt + noise, 0, 1);
+                moistureMap[y][x] = moisture;
+            }
+        }
+
+        return moistureMap;
+    }
+
+    static pickBiome(heightValue, moisture, x, y, width, height) {
+        const northBand = y < height * 0.18;
+        const centralGrove = this.inCircle(x, y, width / 2, height / 2, 36);
+        const southernDune = y > height * 0.74 && x > width * 0.55;
+
+        if (heightValue < 0.24) return 'water';
+        if (heightValue < 0.3) return 'beach';
+
+        if (heightValue > 0.82) {
+            return northBand ? 'snow' : 'mountain';
+        }
+
+        if (heightValue > 0.72) {
+            return moisture > 0.55 ? 'mountain' : 'hills';
+        }
+
+        if (southernDune && moisture < 0.45) {
+            return 'desert';
+        }
+
+        if (centralGrove) {
+            return moisture > 0.55 ? 'grassland' : 'plains';
+        }
+
+        if (moisture < 0.22) return 'desert';
+        if (moisture < 0.4) return 'plains';
+        if (moisture < 0.68) return 'grassland';
+        return 'forest';
+    }
+
+    static addRivers(worldMap, heightMap, width, height) {
+        const sources = [
+            { x: Math.floor(width * 0.22), y: Math.floor(height * 0.18), target: { x: Math.floor(width * 0.48), y: height - 2 } },
+            { x: Math.floor(width * 0.76), y: Math.floor(height * 0.26), target: { x: 2, y: Math.floor(height * 0.62) } },
+            { x: Math.floor(width * 0.55), y: Math.floor(height * 0.14), target: { x: Math.floor(width * 0.62), y: height - 3 } }
+        ];
+
+        sources.forEach(source => {
+            this.carveRiverPath(worldMap, heightMap, source.x, source.y, source.target.x, source.target.y);
+        });
+    }
+
+    static carveRiverPath(worldMap, heightMap, startX, startY, targetX, targetY) {
+        let x = startX;
+        let y = startY;
+        const maxSteps = worldMap.length * 2;
+
+        for (let i = 0; i < maxSteps; i++) {
+            if (!this.inBounds(worldMap, x, y)) break;
+
+            if (worldMap[y][x] === 'water') break;
+            worldMap[y][x] = 'river';
+
+            const neighbors = this.getNeighbors(x, y);
+            let best = { x, y, score: Infinity };
+
+            neighbors.forEach(n => {
+                if (!this.inBounds(worldMap, n.x, n.y)) return;
+                const heightScore = heightMap[n.y][n.x];
+                const flowBias = this.distance(n.x, n.y, targetX, targetY) / Math.max(worldMap[0].length, worldMap.length) * 0.15;
+                const jitter = this.hashNoise(n.x, n.y, i) * 0.05;
+                const score = heightScore + flowBias + jitter;
+
+                if (score < best.score) {
+                    best = { x: n.x, y: n.y, score };
+                }
+            });
+
+            // widen river occasionally
+            if (i % 9 === 0) {
+                this.getNeighbors(x, y).forEach(n => {
+                    if (this.inBounds(worldMap, n.x, n.y) && worldMap[n.y][n.x] !== 'water') {
+                        worldMap[n.y][n.x] = 'river';
+                    }
+                });
+            }
+
+            if (best.x === x && best.y === y) break;
+            x = best.x;
+            y = best.y;
+        }
+    }
+
+    static addBridges(worldMap, width, height) {
+        const preferredSpans = [
+            { x: Math.floor(width * 0.48), y: Math.floor(height * 0.54) },
+            { x: Math.floor(width * 0.34), y: Math.floor(height * 0.44) },
+            { x: Math.floor(width * 0.62), y: Math.floor(height * 0.66) }
+        ];
+
+        preferredSpans.forEach(span => this.placeBridgeNear(worldMap, span.x, span.y, 4));
+    }
+
+    static placeBridgeNear(worldMap, cx, cy, radius) {
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                const x = cx + dx;
+                const y = cy + dy;
+                if (this.inBounds(worldMap, x, y) && worldMap[y][x] === 'river') {
+                    worldMap[y][x] = 'bridge';
+                    return;
+                }
+            }
+        }
+    }
+
     static inCircle(x, y, cx, cy, radius) {
         const dx = x - cx;
         const dy = y - cy;
         return (dx * dx + dy * dy) < (radius * radius);
     }
-    
-    static inRectangle(x, y, rx, ry, width, height) {
-        return x >= rx && x < rx + width && y >= ry && y < ry + height;
+
+    static inBounds(map, x, y) {
+        return y >= 0 && y < map.length && x >= 0 && x < map[0].length;
+    }
+
+    static getNeighbors(x, y) {
+        return [
+            { x: x + 1, y },
+            { x: x - 1, y },
+            { x, y: y + 1 },
+            { x, y: y - 1 },
+            { x: x + 1, y: y + 1 },
+            { x: x - 1, y: y + 1 },
+            { x: x + 1, y: y - 1 },
+            { x: x - 1, y: y - 1 }
+        ];
+    }
+
+    static distance(x1, y1, x2, y2) {
+        const dx = x1 - x2;
+        const dy = y1 - y2;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    static hashNoise(x, y, seed = 0) {
+        const n = Math.sin(x * 127.1 + y * 311.7 + seed * 19.19) * 43758.5453;
+        return n - Math.floor(n);
     }
 }
 
