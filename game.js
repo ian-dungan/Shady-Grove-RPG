@@ -753,6 +753,7 @@ class GameScene extends Phaser.Scene {
         
         this.createMassiveWorld();
         this.createPlayerSprite();
+        this.placeQuestMarkers();
         
         this.cursors = this.input.keyboard.createCursorKeys();
         this.actionKey = this.input.keyboard.addKey('SPACE');
@@ -783,8 +784,8 @@ class GameScene extends Phaser.Scene {
         // Add world decorations in FIXED positions
         this.addStaticDecorations();
         
-        // Place quest markers
-        this.placeQuestMarkers();
+        // Place quest markers will be added after the player sprite is created
+        // this.placeQuestMarkers();
         
         console.log('Static world loaded!');
     }
@@ -1276,6 +1277,7 @@ class GameScene extends Phaser.Scene {
     }
     
     placeQuestMarkers() {
+        if (!this.playerSprite) { console.warn("placeQuestMarkers called before player sprite exists"); return; }
         GameConfig.story.objectives.forEach((quest, index) => {
             if (index === this.player.currentQuest) {
                 const x = quest.location.x * this.tileSize;
