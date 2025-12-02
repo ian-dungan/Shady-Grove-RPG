@@ -1551,15 +1551,22 @@ class GameScene extends Phaser.Scene {
         const startX = (this.worldWidth / 2) * this.tileSize;
         const startY = (this.worldHeight / 2) * this.tileSize;
         
-        this.playerSprite = this.add.sprite(startX, startY, `char_${this.player.className}`);
-        this.playerSprite.setScale(1.5);
+        this.playerSprite = this.add.container(startX, startY);
+        this.playerSpriteImage = this.add.sprite(0, 0, `char_${this.player.className}`);
+        this.playerSpriteImage.setScale(1.5);
+        this.playerSprite.add(this.playerSpriteImage);
         this.physics.add.existing(this.playerSprite);
+        this.playerSprite.setSize(24, 28);
         this.playerSprite.body.setSize(24, 28);
+        this.playerSprite.body.setOffset(-12, -14);
+        this.playerSprite.body.setCollideWorldBounds(true);
         this.playerSprite.setDepth(50);
-        
+
+        this.physics.world.setBounds(0, 0, this.worldWidth * this.tileSize, this.worldHeight * this.tileSize);
+
         this.playerShadow = this.add.ellipse(startX, startY + 20, 28, 10, 0x000000, 0.4);
         this.playerShadow.setDepth(49);
-        
+
         this.playerGlow = this.add.circle(startX, startY, 24, 0x3498db, 0.15);
         this.playerGlow.setDepth(48);
         
@@ -1571,6 +1578,15 @@ class GameScene extends Phaser.Scene {
             yoyo: true,
             repeat: -1
         });
+
+        // Vertical movement state for jumping physics
+        this.playerElevation = 0;
+        this.verticalVelocity = 0;
+        this.jumpSpeed = 650;
+        this.gravity = 1800;
+        this.maxFallSpeed = 2000;
+        this.isOnGround = true;
+        this.jumpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         
         this.cameras.main.startFollow(this.playerSprite, true, 0.1, 0.1);
         this.cameras.main.setBounds(0, 0, this.worldWidth * this.tileSize, this.worldHeight * this.tileSize);
@@ -1582,6 +1598,7 @@ class GameScene extends Phaser.Scene {
         if (!this.playerSprite || !this.playerSprite.body) return;
 
         const speed = 200;
+        const deltaSeconds = this.game.loop.delta / 1000;
 
         // Reset velocity each frame
         this.playerSprite.body.setVelocity(0);
@@ -1648,16 +1665,37 @@ class GameScene extends Phaser.Scene {
             moving = true;
 
             if (vx < 0) {
-                this.playerSprite.setFlipX(true);
+                this.playerSpriteImage.setFlipX(true);
             } else if (vx > 0) {
-                this.playerSprite.setFlipX(false);
+                this.playerSpriteImage.setFlipX(false);
             }
         }
 
-        // Little bob when moving
-        if (moving) {
-            this.playerSprite.y += Math.sin(Date.now() / 100) * 0.6;
+        // Jump input (keyboard/gamepad)
+        const wantsJump = Phaser.Input.Keyboard.JustDown(this.jumpKey) ||
+            (pad && pad.connected && (pad.A || pad.buttons?.[0]?.pressed));
+
+        if (wantsJump && this.isOnGround) {
+            this.verticalVelocity = this.jumpSpeed;
+            this.isOnGround = false;
         }
+
+        // Apply gravity to vertical velocity and clamp fall speed
+        this.verticalVelocity = Math.max(this.verticalVelocity - this.gravity * deltaSeconds, -this.maxFallSpeed);
+        this.playerElevation += this.verticalVelocity * deltaSeconds;
+
+        // Land on ground
+        if (this.playerElevation <= 0) {
+            this.playerElevation = 0;
+            this.verticalVelocity = 0;
+            this.isOnGround = true;
+        }
+
+        // Offset sprite for jump height and adjust shadow to sell depth
+        this.playerSpriteImage.y = -this.playerElevation;
+        this.playerShadow.scaleX = 1 - Math.min(0.4, this.playerElevation / 400);
+        this.playerShadow.scaleY = 1 - Math.min(0.4, this.playerElevation / 400);
+        this.playerShadow.alpha = 0.4 - Math.min(0.2, this.playerElevation / 800);
 
         // Keep shadow and glow under the player
         this.playerShadow.x = this.playerSprite.x;
