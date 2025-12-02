@@ -180,6 +180,64 @@ class StaticWorldMap {
     }
 }
 
+// ===== HEIGHTMAP FOR GROUND COLLISION =====
+class TerrainHeightmap {
+    constructor(heights, tileSize) {
+        this.heights = heights;
+        this.tileSize = tileSize;
+        this.width = heights[0].length;
+        this.height = heights.length;
+    }
+
+    static generate(width, height, tileSize, worldMap) {
+        const heights = new Array(height);
+
+        for (let y = 0; y < height; y++) {
+            heights[y] = new Array(width);
+            for (let x = 0; x < width; x++) {
+                const biome = worldMap?.[y]?.[x] || 'plains';
+                const base = this.getBiomeBaseHeight(biome) * tileSize;
+
+                // Gentle undulation using trigonometry for hills/valleys
+                const nx = x / width;
+                const ny = y / height;
+                const ridge = Math.sin(nx * Math.PI * 2) * Math.cos(ny * Math.PI * 2) * tileSize * 0.12;
+                const valley = Math.sin((nx + ny) * 3) * tileSize * 0.08;
+
+                heights[y][x] = base + ridge + valley;
+            }
+        }
+
+        return new TerrainHeightmap(heights, tileSize);
+    }
+
+    static getBiomeBaseHeight(biome) {
+        switch (biome) {
+            case 'mountain':
+                return 1.6;
+            case 'hills':
+                return 1.2;
+            case 'forest':
+            case 'grassland':
+                return 1.0;
+            case 'plains':
+                return 0.9;
+            case 'desert':
+                return 0.8;
+            case 'snow':
+                return 1.4;
+            default:
+                return 0.85;
+        }
+    }
+
+    getHeightAt(px, py) {
+        const x = Phaser.Math.Clamp(Math.floor(px / this.tileSize), 0, this.width - 1);
+        const y = Phaser.Math.Clamp(Math.floor(py / this.tileSize), 0, this.height - 1);
+        return this.heights[y][x];
+    }
+}
+
 // ===== TILE RENDERER =====
 class TileRenderer {
     static texturesGenerated = false;
@@ -818,9 +876,10 @@ class GameScene extends Phaser.Scene {
         
         // Pre-generate all tile textures FIRST
         TileRenderer.generateAllTextures(this);
-        
+
         // Generate STATIC terrain map
         this.worldMap = StaticWorldMap.createWorldMap(this.worldWidth, this.worldHeight);
+        this.heightMap = TerrainHeightmap.generate(this.worldWidth, this.worldHeight, this.tileSize, this.worldMap);
         
         // Render tiles
         this.renderStaticWorld();
@@ -1364,15 +1423,22 @@ class GameScene extends Phaser.Scene {
         const startX = (this.worldWidth / 2) * this.tileSize;
         const startY = (this.worldHeight / 2) * this.tileSize;
         
-        this.playerSprite = this.add.sprite(startX, startY, `char_${this.player.className}`);
-        this.playerSprite.setScale(1.5);
+        this.playerSprite = this.add.container(startX, startY);
+        this.playerSpriteImage = this.add.sprite(0, 0, `char_${this.player.className}`);
+        this.playerSpriteImage.setScale(1.5);
+        this.playerSprite.add(this.playerSpriteImage);
         this.physics.add.existing(this.playerSprite);
+        this.playerSprite.setSize(24, 28);
         this.playerSprite.body.setSize(24, 28);
+        this.playerSprite.body.setOffset(-12, -14);
+        this.playerSprite.body.setCollideWorldBounds(true);
         this.playerSprite.setDepth(50);
-        
+
+        this.physics.world.setBounds(0, 0, this.worldWidth * this.tileSize, this.worldHeight * this.tileSize);
+
         this.playerShadow = this.add.ellipse(startX, startY + 20, 28, 10, 0x000000, 0.4);
         this.playerShadow.setDepth(49);
-        
+
         this.playerGlow = this.add.circle(startX, startY, 24, 0x3498db, 0.15);
         this.playerGlow.setDepth(48);
         
@@ -1384,6 +1450,16 @@ class GameScene extends Phaser.Scene {
             yoyo: true,
             repeat: -1
         });
+
+        // Vertical movement state for jumping physics anchored to terrain heightmap
+        const startingGroundHeight = this.heightMap.getHeightAt(startX, startY);
+        this.playerElevation = startingGroundHeight;
+        this.verticalVelocity = 0;
+        this.jumpSpeed = 650;
+        this.gravity = 1800;
+        this.maxFallSpeed = 2000;
+        this.isOnGround = true;
+        this.jumpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         
         this.cameras.main.startFollow(this.playerSprite, true, 0.1, 0.1);
         this.cameras.main.setBounds(0, 0, this.worldWidth * this.tileSize, this.worldHeight * this.tileSize);
@@ -1395,6 +1471,7 @@ class GameScene extends Phaser.Scene {
         if (!this.playerSprite || !this.playerSprite.body) return;
 
         const speed = 200;
+        const deltaSeconds = this.game.loop.delta / 1000;
 
         // Reset velocity each frame
         this.playerSprite.body.setVelocity(0);
@@ -1461,16 +1538,44 @@ class GameScene extends Phaser.Scene {
             moving = true;
 
             if (vx < 0) {
-                this.playerSprite.setFlipX(true);
+                this.playerSpriteImage.setFlipX(true);
             } else if (vx > 0) {
-                this.playerSprite.setFlipX(false);
+                this.playerSpriteImage.setFlipX(false);
             }
         }
 
-        // Little bob when moving
-        if (moving) {
-            this.playerSprite.y += Math.sin(Date.now() / 100) * 0.6;
+        // Sample the terrain height beneath the player for grounded collision
+        const groundHeight = this.heightMap.getHeightAt(this.playerSprite.x, this.playerSprite.y);
+
+        // Jump input (keyboard/gamepad)
+        const gamepadJump = pad && pad.connected && (pad.buttons?.[0]?.pressed || pad.buttons?.[0]?.value > 0.1 || pad.A);
+        const wantsJump = Phaser.Input.Keyboard.JustDown(this.jumpKey) || gamepadJump;
+
+        if (wantsJump && this.isOnGround) {
+            this.verticalVelocity = this.jumpSpeed;
+            this.isOnGround = false;
         }
+
+        // Apply gravity to vertical velocity and clamp fall speed
+        this.verticalVelocity = Math.max(this.verticalVelocity - this.gravity * deltaSeconds, -this.maxFallSpeed);
+        this.playerElevation += this.verticalVelocity * deltaSeconds;
+
+        // Land on ground heightmap instead of falling through terrain
+        if (this.playerElevation <= groundHeight) {
+            this.playerElevation = groundHeight;
+            this.verticalVelocity = 0;
+            this.isOnGround = true;
+        } else {
+            this.isOnGround = false;
+        }
+
+        const jumpHeight = Math.max(0, this.playerElevation - groundHeight);
+
+        // Offset sprite for jump height and adjust shadow to sell depth
+        this.playerSpriteImage.y = -jumpHeight;
+        this.playerShadow.scaleX = 1 - Math.min(0.4, jumpHeight / 400);
+        this.playerShadow.scaleY = 1 - Math.min(0.4, jumpHeight / 400);
+        this.playerShadow.alpha = 0.4 - Math.min(0.2, jumpHeight / 800);
 
         // Keep shadow and glow under the player
         this.playerShadow.x = this.playerSprite.x;
