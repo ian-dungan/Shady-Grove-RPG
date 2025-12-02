@@ -35,6 +35,27 @@ function sanitizeChatMessage(message) {
     return message.trim().slice(0, 280);
 }
 
+function sanitizeCombatEvent(event) {
+    if (typeof event !== 'string') return '';
+    return event.trim().slice(0, 200);
+}
+
+function sendError(ws, message, code = 'bad_request') {
+    ws.send(
+        JSON.stringify({
+            type: 'error',
+            code,
+            message
+        })
+    );
+}
+
+function ensurePlayerJoined(ws, playerId) {
+    if (playerId) return true;
+    sendError(ws, 'Join the game before sending actions.', 'not_joined');
+    return false;
+}
+
 wss.on('connection', (ws) => {
     console.log('New player connected');
 
@@ -51,6 +72,11 @@ wss.on('connection', (ws) => {
 
             switch (data.type) {
                 case 'join':
+                    if (playerId) {
+                        sendError(ws, 'Already joined.', 'conflict');
+                        return;
+                    }
+
                     playerId = generatePlayerId();
                     const playerName = sanitizePlayerName(data.player);
                     players.set(playerId, {
@@ -72,8 +98,15 @@ wss.on('connection', (ws) => {
                         playerCount: players.size
                     }, playerId);
                     break;
-                    
+
                 case 'move':
+                    if (!ensurePlayerJoined(ws, playerId)) return;
+
+                    if (!Number.isFinite(data.x) || !Number.isFinite(data.y)) {
+                        sendError(ws, 'Movement requires numeric coordinates.');
+                        return;
+                    }
+
                     // Broadcast player movement
                     broadcast({
                         type: 'playerMove',
@@ -82,17 +115,27 @@ wss.on('connection', (ws) => {
                         y: data.y
                     }, playerId);
                     break;
-                    
+
                 case 'combat':
+                    if (!ensurePlayerJoined(ws, playerId)) return;
+
+                    const combatEvent = sanitizeCombatEvent(data.event);
+                    if (!combatEvent) {
+                        sendError(ws, 'Combat event description required.');
+                        return;
+                    }
+
                     // Broadcast combat events
                     broadcast({
                         type: 'combatEvent',
                         playerId: playerId,
-                        event: data.event
+                        event: combatEvent
                     }, playerId);
                     break;
-                    
+
                 case 'chat':
+                    if (!ensurePlayerJoined(ws, playerId)) return;
+
                     // Broadcast chat messages
                     const player = players.get(playerId);
                     const messageText = sanitizeChatMessage(data.message);
@@ -104,17 +147,22 @@ wss.on('connection', (ws) => {
                     });
                     break;
                 default:
-                    ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
+                    sendError(ws, 'Unknown message type.', 'unsupported');
             }
         } catch (e) {
             console.error('Error parsing message:', e);
-            ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+            sendError(ws, 'Invalid message format.');
         }
     });
 
     ws.on('close', () => {
         removePlayer(playerId);
         console.log('Player disconnected');
+    });
+
+    ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+        removePlayer(playerId);
     });
 });
 
